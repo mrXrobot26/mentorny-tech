@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -15,7 +19,9 @@ export class UserService {
 
   // Create user with email uniqueness check
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.userRepository.findOneBy({ email: createUserDto.email });
+    const existingUser = await this.userRepository.findOneBy({
+      email: createUserDto.email,
+    });
     if (existingUser) {
       throw new BadRequestException('Email already exists');
     }
@@ -43,13 +49,23 @@ export class UserService {
     return user;
   }
 
+  async findOneByEmail(email: string): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      throw new NotFoundException(`User with email ${email} not found`);
+    }
+    return user;
+  }
+
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
     if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.userRepository.findOneBy({ email: updateUserDto.email });
+      const existingUser = await this.userRepository.findOneBy({
+        email: updateUserDto.email,
+      });
       if (existingUser) {
         throw new BadRequestException('Email already exists');
       }
@@ -57,7 +73,7 @@ export class UserService {
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
-  
+
     await this.userRepository.update(id, updateUserDto);
     return { ...user, ...updateUserDto } as User;
   }
@@ -67,5 +83,4 @@ export class UserService {
 
     await this.userRepository.delete(id);
   }
-
 }
