@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserService {
@@ -19,7 +20,12 @@ export class UserService {
       throw new BadRequestException('Email already exists');
     }
 
-    const user = this.userRepository.create(createUserDto);
+    // Hash the password before saving
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const user = this.userRepository.create({
+      ...createUserDto,
+      password: hashedPassword,
+    });
     return await this.userRepository.save(user);
   }
 
@@ -37,18 +43,29 @@ export class UserService {
     return user;
   }
 
-  // Update user with existence check
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id); // will throw if not found
-
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const existingUser = await this.userRepository.findOneBy({ email: updateUserDto.email });
+      if (existingUser) {
+        throw new BadRequestException('Email already exists');
+      }
+    }
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
+  
     await this.userRepository.update(id, updateUserDto);
-    return await this.findOne(id); // return updated user
+    return { ...user, ...updateUserDto } as User;
   }
 
-  // Remove user with existence check
   async remove(id: number): Promise<void> {
-    const user = await this.findOne(id); // will throw if not found
+    await this.findOne(id);
 
     await this.userRepository.delete(id);
   }
+
 }
