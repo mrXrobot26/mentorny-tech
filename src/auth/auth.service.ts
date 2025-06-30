@@ -16,7 +16,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async validateUserInService(email: string, password: string): Promise<any> {
+  async validateUserInService(email: string, password: string) {
     try {
       const user = await this.userService.findOneByEmail(email);
       if (user && (await bcrypt.compare(password, user.password))) {
@@ -25,6 +25,7 @@ export class AuthService {
       }
       return null;
     } catch (error) {
+      console.log(error);
       return null;
     }
   }
@@ -40,7 +41,8 @@ async login(loginDto: LoginDto): Promise<any> {
         }
         const payload = { email: user.email, sub: user.id };
         return {
-             user: {
+            access_token: this.jwtService.sign(payload),
+            user: {
                 id: user.id,
                 email: user.email,
                 name: user.name,
@@ -64,10 +66,10 @@ async login(loginDto: LoginDto): Promise<any> {
 
       const payload = { email: user.email, sub: user.id };
       return {
-        access_token: this.jwtService.sign(payload),
         user: result,
       };
     } catch (error) {
+      console.log(error);
       throw new BadRequestException('Registration failed');
     }
   }
