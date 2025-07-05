@@ -1,3 +1,4 @@
+import { Role } from '../../auth/enums/role.enum';
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 @Entity()
 export class User {
@@ -15,4 +16,10 @@ export class User {
 
   @Column()
   age: number;
+
+  @Column({
+    type: 'simple-array',
+    default: () => `'${Role.USER}'`,
+  })
+  roles: Role[];
 }
