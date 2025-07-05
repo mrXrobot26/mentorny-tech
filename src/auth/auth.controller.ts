@@ -2,16 +2,19 @@ import {
   Controller,
   Request,
   Post,
+  Get,
   UseGuards,
   Body,
   Patch,
   Param,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
+import { User } from './decorators/user.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Role } from './enums/role.enum';
@@ -32,24 +35,33 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
-  // Admin only - update user roles
+  // Get current user profile
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  getProfile(@User() user: any) {
+    return user;
+  }
+
+  // Super Admin only - update user roles
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   @Patch('users/:id/roles')
   async updateUserRoles(
     @Param('id') id: string,
     @Body() body: { roles: Role[] },
+    @User() currentUser: any,
   ) {
-    return this.authService.updateUserRoles(+id, body.roles);
-  }
+    // Prevent super admin from being modified
+    const targetUser = await this.authService.getUserById(+id);
+    if (targetUser.roles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException('Super admin roles cannot be modified');
+    }
 
-  // Special endpoint to create first admin (remove this after creating first admin)
-  @Post('create-first-admin')
-  async createFirstAdmin(@Body() registerDto: RegisterDto) {
-    const createUserDto = {
-      ...registerDto,
-      roles: [Role.ADMIN],
-    };
-    return this.authService.createFirstAdmin(createUserDto);
+    // Prevent creating new super admins
+    if (body.roles.includes(Role.SUPER_ADMIN)) {
+      throw new ForbiddenException('Cannot assign super admin role');
+    }
+
+    return this.authService.updateUserRoles(+id, body.roles);
   }
 }
