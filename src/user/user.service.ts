@@ -9,6 +9,7 @@ import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { Role } from '../auth/enums/role.enum';
 
 @Injectable()
 export class UserService {
@@ -31,6 +32,7 @@ export class UserService {
     const user = this.userRepository.create({
       ...createUserDto,
       password: hashedPassword,
+      roles: createUserDto.roles || [Role.USER], // Default to USER role
     });
     return await this.userRepository.save(user);
   }
@@ -57,7 +59,7 @@ export class UserService {
     return null;
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(id: number, updateUserDto: UpdateUserDto) {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
@@ -75,7 +77,7 @@ export class UserService {
     }
 
     await this.userRepository.update(id, updateUserDto);
-    return { ...user, ...updateUserDto } as User;
+    return await this.userRepository.findOne({ where: { id } });
   }
 
   async remove(id: number): Promise<void> {
