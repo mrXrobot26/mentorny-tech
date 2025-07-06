@@ -22,4 +22,10 @@ export class User {
     default: () => `'${Role.USER}'`,
   })
   roles: Role[];
+
+  @Column({ nullable: true })
+  refreshTokenHash: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  refreshTokenExpiresAt: Date;
 }

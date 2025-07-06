@@ -10,6 +10,9 @@ import { JwtService } from '@nestjs/jwt/dist/jwt.service';
 import { UserService } from 'src/user/user.service';
 import * as bcrypt from 'bcrypt';
 import { Role } from './enums/role.enum';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UserResponseDto } from '../user/dto/user-response.dto';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -41,9 +44,13 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException('Invalid credentials');
       }
-      const payload = { email: user.email, sub: user.id, roles: user.roles };
+      
+      const tokens = await this.generateTokens(user);
+      
+      // Store hashed refresh token in database
+      await this.storeRefreshToken(user.id, tokens.refresh_token);
+      
       return {
-        access_token: this.jwtService.sign(payload),
         user: {
           id: user.id,
           email: user.email,
@@ -51,6 +58,8 @@ export class AuthService {
           age: user.age,
           roles: user.roles,
         },
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
       };
     } catch (error) {
       throw new UnauthorizedException('Login failed');
@@ -71,12 +80,16 @@ export class AuthService {
       };
 
       const user = await this.userService.create(createUserDto);
-      const { password, ...result } = user;
+      
+      const tokens = await this.generateTokens(user);
+      
+      // Store hashed refresh token in database
+      await this.storeRefreshToken(user.id, tokens.refresh_token);
 
-      const payload = { email: user.email, sub: user.id, roles: user.roles };
       return {
-        user: result,
-        access_token: this.jwtService.sign(payload),
+        user: user,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
       };
     } catch (error) {
       console.log(error);
@@ -84,31 +97,122 @@ export class AuthService {
     }
   }
 
-  // Get user by ID
-  async getUserById(userId: number) {
+  private async generateTokens(user: any) {
+    const payload = { email: user.email, sub: user.id, roles: user.roles };
+    
+    // Generate short-lived access token
+    const access_token = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: process.env.JWT_ACCESS_EXPIRATION,
+    });
+    
+    // Generate random refresh token (more secure for database storage)
+    const refresh_token = this.generateRefreshToken();
+
+    return {
+      access_token,
+      refresh_token,
+    };
+  }
+
+  private generateRefreshToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  private async storeRefreshToken(userId: number, refreshToken: string): Promise<void> {
+    // Hash the refresh token before storing
+    const hashedToken = await bcrypt.hash(refreshToken, 10);
+    
+    // Calculate expiration date
+    const expiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
+    const expiresAt = this.calculateExpirationDate(expiration);
+    
+    // Store through user service (proper layer separation)
+    await this.userService.updateRefreshToken(userId, hashedToken, expiresAt);
+  }
+
+  private calculateExpirationDate(expiration: string): Date {
+    const match = expiration.match(/^(\d+)([smhd])$/);
+    let expiresInMs = 7 * 24 * 60 * 60 * 1000; // Default 7 days
+    
+    if (match) {
+      const value = parseInt(match[1], 10);
+      const unit = match[2];
+      
+      switch (unit) {
+        case 's':
+          expiresInMs = value * 1000;
+          break;
+        case 'm':
+          expiresInMs = value * 60 * 1000;
+          break;
+        case 'h':
+          expiresInMs = value * 60 * 60 * 1000;
+          break;
+        case 'd':
+          expiresInMs = value * 24 * 60 * 60 * 1000;
+          break;
+      }
+    }
+    
+    return new Date(Date.now() + expiresInMs);
+  }
+
+  async refreshTokens(refreshTokenDto: RefreshTokenDto): Promise<any> {
+    try {
+      const { refreshToken } = refreshTokenDto;
+      
+      // Find user by refresh token
+      const user = await this.userService.findUserByRefreshToken(refreshToken);
+      if (!user) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+      
+      // Check if refresh token is expired
+      if (user.refreshTokenExpiresAt < new Date()) {
+        // Clean up expired token
+        await this.userService.clearRefreshToken(user.id);
+        throw new UnauthorizedException('Refresh token expired');
+      }
+      
+      // Generate new tokens (token rotation for security)
+      const tokens = await this.generateTokens(user);
+      
+      // Store new hashed refresh token
+      await this.storeRefreshToken(user.id, tokens.refresh_token);
+      
+      return {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
+  async logout(userId: number): Promise<void> {
+    await this.userService.clearRefreshToken(userId);
+  }
+
+  async getUserById(userId: number): Promise<UserResponseDto> {
     return await this.userService.findOne(userId);
   }
 
   // Super Admin method to change user roles
-  async updateUserRoles(userId: number, roles: Role[]) {
-    const user = await this.userService.findOne(userId);
-    
-    // Prevent modification of super admin roles
+  async updateUserRoles(userId: number, roles: Role[]): Promise<UserResponseDto> {
+    const user = await this.userService.findOneEntity(userId);
     if (user.roles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException('Super admin roles cannot be modified');
     }
-    
-    // Prevent creation of new super admins
     if (roles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException('Cannot assign super admin role');
     }
-    
-    // Ensure user role is always included
     if (!roles.includes(Role.USER)) {
       roles.push(Role.USER);
     }
-    
-    const updatedUser = await this.userService.update(userId, { roles });
-    return updatedUser;
+    return await this.userService.update(userId, { roles });
   }
 }

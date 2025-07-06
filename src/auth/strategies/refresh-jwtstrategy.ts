@@ -6,27 +6,24 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
+export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   constructor(private readonly userService: UserService) {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is not set');
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!refreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET environment variable is not set');
     }
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
       ignoreExpiration: false,
-      secretOrKey: jwtSecret,
+      secretOrKey: refreshSecret,
     });
   }
 
   async validate(payload: any) {
-    console.log(`Validating JWT payload: ${JSON.stringify(payload)}`);
     const user = await this.userService.findOne(payload.sub);
     return {
       userId: user.id,
       email: user.email,
-      name: user.name,
-      age: user.age,
       roles: user.roles,
     };
   }

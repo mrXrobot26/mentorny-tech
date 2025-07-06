@@ -17,6 +17,8 @@ import { Roles } from './decorators/roles.decorator';
 import { User } from './decorators/user.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UserResponseDto } from '../user/dto/user-response.dto';
 import { Role } from './enums/role.enum';
 
 @Controller('auth')
@@ -35,11 +37,29 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @Post('refresh')
+  async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refreshTokens(refreshTokenDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  async logout(@User() user: any) {
+    await this.authService.logout(user.userId);
+    return { message: 'Logged out successfully' };
+  }
+
   // Get current user profile
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@User() user: any) {
-    return user;
+  getProfile(@User() user: any): UserResponseDto {
+    return {
+      id: user.userId,
+      email: user.email,
+      name: user.name,
+      age: user.age,
+      roles: user.roles,
+    };
   }
 
   // Super Admin only - update user roles
@@ -50,14 +70,12 @@ export class AuthController {
     @Param('id') id: string,
     @Body() body: { roles: Role[] },
     @User() currentUser: any,
-  ) {
-    // Prevent super admin from being modified
+  ): Promise<UserResponseDto> {
     const targetUser = await this.authService.getUserById(+id);
     if (targetUser.roles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException('Super admin roles cannot be modified');
     }
 
-    // Prevent creating new super admins
     if (body.roles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException('Cannot assign super admin role');
     }

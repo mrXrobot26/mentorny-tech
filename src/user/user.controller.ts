@@ -13,6 +13,7 @@ import {
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserResponseDto } from './dto/user-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -26,19 +27,19 @@ export class UserController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Get()
-  async findAll() {
+  async findAll(): Promise<UserResponseDto[]> {
     return this.userService.findAll();
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
     return this.userService.findOne(+id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
     return this.userService.update(+id, updateUserDto);
   }
 
@@ -46,9 +47,9 @@ export class UserController {
   @Roles(Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(204)
-  async remove(@Param('id') id: string, @User() currentUser: any) {
+  async remove(@Param('id') id: string, @User() currentUser: any): Promise<void> {
     // Prevent super admin from being deleted
-    const targetUser = await this.userService.findOne(+id);
+    const targetUser = await this.userService.findOneEntity(+id);
     if (targetUser.roles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException('Super admin cannot be deleted');
     }
