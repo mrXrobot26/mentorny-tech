@@ -20,6 +20,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UserResponseDto } from '../user/dto/user-response.dto';
 import { Role } from './enums/role.enum';
+import { ResponseDto } from '../common/decorators/response.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -52,7 +53,8 @@ export class AuthController {
   // Get current user profile
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@User() user: any): UserResponseDto {
+  @ResponseDto(UserResponseDto)
+  getProfile(@User() user: any) {
     return {
       id: user.userId,
       email: user.email,
@@ -66,11 +68,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Patch('users/:id/roles')
+  @ResponseDto(UserResponseDto)
   async updateUserRoles(
     @Param('id') id: string,
     @Body() body: { roles: Role[] },
     @User() currentUser: any,
-  ): Promise<UserResponseDto> {
+  ) {
     const targetUser = await this.authService.getUserById(+id);
     if (targetUser.roles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException('Super admin roles cannot be modified');

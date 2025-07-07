@@ -8,7 +8,6 @@ import { Repository, Not, IsNull } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UserResponseDto } from './dto/user-response.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../auth/enums/role.enum';
 
@@ -20,7 +19,7 @@ export class UserService {
   ) {}
 
   // Create user with email uniqueness check
-  async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
+  async create(createUserDto: CreateUserDto): Promise<User> {
     const existingUser = await this.userRepository.findOneBy({
       email: createUserDto.email,
     });
@@ -37,40 +36,22 @@ export class UserService {
     });
     const savedUser = await this.userRepository.save(user);
 
-    return {
-      id: savedUser.id,
-      email: savedUser.email,
-      name: savedUser.name,
-      age: savedUser.age,
-      roles: savedUser.roles,
-    };
+    return savedUser;
   }
 
   // Find all users
-  async findAll(): Promise<UserResponseDto[]> {
+  async findAll(): Promise<User[]> {
     const users = await this.userRepository.find();
-    return users.map(user => ({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      age: user.age,
-      roles: user.roles,
-    }));
+    return users;
   }
 
   // Find user by ID with not found validation
-  async findOne(id: number): Promise<UserResponseDto> {
+  async findOne(id: number): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      age: user.age,
-      roles: user.roles,
-    };
+    return user;
   }
 
   // Internal method to get full user entity (for auth operations)
@@ -87,7 +68,7 @@ export class UserService {
     return user;
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
+  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
@@ -106,18 +87,12 @@ export class UserService {
 
     await this.userRepository.update(id, updateUserDto);
     const updatedUser = await this.userRepository.findOne({ where: { id } });
-    
+
     if (!updatedUser) {
       throw new NotFoundException(`User with ID ${id} not found after update`);
     }
 
-    return {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      name: updatedUser.name,
-      age: updatedUser.age,
-      roles: updatedUser.roles,
-    };
+    return updatedUser;
   }
 
   async remove(id: number): Promise<void> {
@@ -126,7 +101,11 @@ export class UserService {
   }
 
   // Refresh token methods - these need full entity access
-  async updateRefreshToken(userId: number, hashedToken: string, expiresAt: Date): Promise<void> {
+  async updateRefreshToken(
+    userId: number,
+    hashedToken: string,
+    expiresAt: Date,
+  ): Promise<void> {
     await this.userRepository.update(userId, {
       refreshTokenHash: hashedToken,
       refreshTokenExpiresAt: expiresAt,
@@ -136,18 +115,22 @@ export class UserService {
   async findUserByRefreshToken(refreshToken: string): Promise<User | null> {
     // Find all users with refresh tokens
     const users = await this.userRepository.find({
-      where: { 
-        refreshTokenHash: Not(IsNull()) 
+      where: {
+        refreshTokenHash: Not(IsNull()),
       },
     });
-    
+
     // Check each user's hashed token against the provided token
     for (const user of users) {
-      if (user.refreshTokenHash && user.refreshTokenHash !== '' && await bcrypt.compare(refreshToken, user.refreshTokenHash)) {
+      if (
+        user.refreshTokenHash &&
+        user.refreshTokenHash !== '' &&
+        (await bcrypt.compare(refreshToken, user.refreshTokenHash))
+      ) {
         return user;
       }
     }
-    
+
     return null;
   }
 

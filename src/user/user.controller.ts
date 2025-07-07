@@ -19,6 +19,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { User } from '../auth/decorators/user.decorator';
+import { ResponseDto } from '../common/decorators/response.decorator';
 
 @Controller('user')
 export class UserController {
@@ -26,20 +27,23 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
+  @ResponseDto(UserResponseDto)
   @Get()
-  async findAll(): Promise<UserResponseDto[]> {
+  async findAll() {
     return this.userService.findAll();
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+  @ResponseDto(UserResponseDto)
+  async findOne(@Param('id') id: string) {
     return this.userService.findOne(+id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
+  @ResponseDto(UserResponseDto)
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(+id, updateUserDto);
   }
 
@@ -47,7 +51,7 @@ export class UserController {
   @Roles(Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(204)
-  async remove(@Param('id') id: string, @User() currentUser: any): Promise<void> {
+  async remove(@Param('id') id: string, @User() currentUser: any) {
     // Prevent super admin from being deleted
     const targetUser = await this.userService.findOneEntity(+id);
     if (targetUser.roles.includes(Role.SUPER_ADMIN)) {
