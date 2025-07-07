@@ -13,6 +13,7 @@ import { Role } from './enums/role.enum';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UserResponseDto } from '../user/dto/user-response.dto';
 import { randomBytes } from 'crypto';
+import { User } from 'src/user/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -44,12 +45,12 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException('Invalid credentials');
       }
-      
+
       const tokens = await this.generateTokens(user);
-      
+
       // Store hashed refresh token in database
       await this.storeRefreshToken(user.id, tokens.refresh_token);
-      
+
       return {
         user: {
           id: user.id,
@@ -66,7 +67,7 @@ export class AuthService {
     }
   }
 
-  async register(registerDto: RegisterDto): Promise<any> {
+  async register(registerDto: RegisterDto) {
     const existingUser = await this.userService.findOneByEmail(
       registerDto.email,
     );
@@ -80,9 +81,9 @@ export class AuthService {
       };
 
       const user = await this.userService.create(createUserDto);
-      
+
       const tokens = await this.generateTokens(user);
-      
+
       // Store hashed refresh token in database
       await this.storeRefreshToken(user.id, tokens.refresh_token);
 
@@ -99,13 +100,13 @@ export class AuthService {
 
   private async generateTokens(user: any) {
     const payload = { email: user.email, sub: user.id, roles: user.roles };
-    
+
     // Generate short-lived access token
     const access_token = this.jwtService.sign(payload, {
       secret: process.env.JWT_SECRET,
       expiresIn: process.env.JWT_ACCESS_EXPIRATION,
     });
-    
+
     // Generate random refresh token (more secure for database storage)
     const refresh_token = this.generateRefreshToken();
 
@@ -119,14 +120,14 @@ export class AuthService {
     return randomBytes(32).toString('hex');
   }
 
-  private async storeRefreshToken(userId: number, refreshToken: string): Promise<void> {
+  private async storeRefreshToken(userId: number, refreshToken: string) {
     // Hash the refresh token before storing
     const hashedToken = await bcrypt.hash(refreshToken, 10);
-    
+
     // Calculate expiration date
     const expiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
     const expiresAt = this.calculateExpirationDate(expiration);
-    
+
     // Store through user service (proper layer separation)
     await this.userService.updateRefreshToken(userId, hashedToken, expiresAt);
   }
@@ -134,11 +135,11 @@ export class AuthService {
   private calculateExpirationDate(expiration: string): Date {
     const match = expiration.match(/^(\d+)([smhd])$/);
     let expiresInMs = 7 * 24 * 60 * 60 * 1000; // Default 7 days
-    
+
     if (match) {
       const value = parseInt(match[1], 10);
       const unit = match[2];
-      
+
       switch (unit) {
         case 's':
           expiresInMs = value * 1000;
@@ -154,33 +155,33 @@ export class AuthService {
           break;
       }
     }
-    
+
     return new Date(Date.now() + expiresInMs);
   }
 
-  async refreshTokens(refreshTokenDto: RefreshTokenDto): Promise<any> {
+  async refreshTokens(refreshTokenDto: RefreshTokenDto) {
     try {
       const { refreshToken } = refreshTokenDto;
-      
+
       // Find user by refresh token
       const user = await this.userService.findUserByRefreshToken(refreshToken);
       if (!user) {
         throw new UnauthorizedException('Invalid refresh token');
       }
-      
+
       // Check if refresh token is expired
       if (user.refreshTokenExpiresAt < new Date()) {
         // Clean up expired token
         await this.userService.clearRefreshToken(user.id);
         throw new UnauthorizedException('Refresh token expired');
       }
-      
+
       // Generate new tokens (token rotation for security)
       const tokens = await this.generateTokens(user);
-      
+
       // Store new hashed refresh token
       await this.storeRefreshToken(user.id, tokens.refresh_token);
-      
+
       return {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
@@ -193,16 +194,16 @@ export class AuthService {
     }
   }
 
-  async logout(userId: number): Promise<void> {
+  async logout(userId: number) {
     await this.userService.clearRefreshToken(userId);
   }
 
-  async getUserById(userId: number): Promise<UserResponseDto> {
+  async getUserById(userId: number): Promise<User> {
     return await this.userService.findOne(userId);
   }
 
   // Super Admin method to change user roles
-  async updateUserRoles(userId: number, roles: Role[]): Promise<UserResponseDto> {
+  async updateUserRoles(userId: number, roles: Role[]): Promise<User> {
     const user = await this.userService.findOneEntity(userId);
     if (user.roles.includes(Role.SUPER_ADMIN)) {
       throw new ForbiddenException('Super admin roles cannot be modified');
