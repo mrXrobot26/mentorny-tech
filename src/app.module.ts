@@ -5,10 +5,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserModule } from './user/user.module';
 import { typeOrmConfigFactory } from './config/typeorm.config';
 import { AuthModule } from './auth/auth.module';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { JSendExceptionFilter } from './common/filters/jsend-exception.filter';
 import { SkillModule } from './skill/skill.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -24,6 +26,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     UserModule,
     AuthModule,
     SkillModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
@@ -31,6 +34,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: JSendExceptionFilter,
     },
   ],
 })
