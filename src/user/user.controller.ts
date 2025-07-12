@@ -20,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { User } from '../auth/decorators/user.decorator';
 import { ResponseDto } from '../common/decorators/response.decorator';
+import { AddSkillsDto } from './dto/add-skills.dto';
 
 @Controller('user')
 export class UserController {
@@ -31,6 +32,13 @@ export class UserController {
   @Get()
   async findAll() {
     return this.userService.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('skills')
+  async addSkills(@User() currentUser: any, @Body() dto: AddSkillsDto) {
+    await this.userService.addSkillsToUser(currentUser.userId, dto.skillNames);
+    return { message: 'Skills added successfully' };
   }
 
   @UseGuards(JwtAuthGuard)

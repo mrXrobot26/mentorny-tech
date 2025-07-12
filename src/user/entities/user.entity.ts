@@ -1,5 +1,12 @@
+import { Skill } from '../../skill/entities/skill.entity';
 import { Role } from '../../auth/enums/role.enum';
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToMany,
+  JoinTable,
+} from 'typeorm';
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
@@ -28,4 +35,8 @@ export class User {
 
   @Column({ type: 'timestamp', nullable: true })
   refreshTokenExpiresAt: Date;
+
+  @ManyToMany(() => Skill, (skill) => skill.users, { cascade: true })
+  @JoinTable()
+  skills: Skill[];
 }
