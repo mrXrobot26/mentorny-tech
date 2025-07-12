@@ -1,14 +1,17 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { UserService } from '../../user/user.service';
-import * as dotenv from 'dotenv';
-dotenv.config();
+
 
 @Injectable()
 export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
-  constructor(private readonly userService: UserService) {
-    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+  constructor(
+    private readonly userService: UserService,
+    private readonly configService: ConfigService,
+  ) {
+    const refreshSecret = configService.get<string>('JWT_REFRESH_SECRET');
     if (!refreshSecret) {
       throw new Error('JWT_REFRESH_SECRET environment variable is not set');
     }

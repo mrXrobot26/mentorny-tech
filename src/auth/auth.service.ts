@@ -7,6 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt/dist/jwt.service';
+import { ConfigService } from '@nestjs/config';
 import { UserService } from 'src/user/user.service';
 import * as bcrypt from 'bcrypt';
 import { Role } from './enums/role.enum';
@@ -20,6 +21,7 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async validateUserInService(email: string, password: string) {
@@ -103,8 +105,8 @@ export class AuthService {
 
     // Generate short-lived access token
     const access_token = this.jwtService.sign(payload, {
-      secret: process.env.JWT_SECRET,
-      expiresIn: process.env.JWT_ACCESS_EXPIRATION,
+      secret: this.configService.get<string>('JWT_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION'),
     });
 
     // Generate random refresh token (more secure for database storage)
@@ -125,7 +127,7 @@ export class AuthService {
     const hashedToken = await bcrypt.hash(refreshToken, 10);
 
     // Calculate expiration date
-    const expiration = process.env.JWT_REFRESH_EXPIRATION || '7d';
+    const expiration = this.configService.get<string>('JWT_REFRESH_EXPIRATION', '7d');
     const expiresAt = this.calculateExpirationDate(expiration);
 
     // Store through user service (proper layer separation)
