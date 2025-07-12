@@ -10,12 +10,15 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../auth/enums/role.enum';
+import { Skill } from '../skill/entities/skill.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Skill)
+    private readonly skillRepository: Repository<Skill>,
   ) {}
 
   // Create user with email uniqueness check
@@ -139,5 +142,30 @@ export class UserService {
       refreshTokenHash: '',
       refreshTokenExpiresAt: new Date(0),
     });
+  }
+
+  async addSkillsToUser(userId: number, skillNames: string[]){
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['skills'],
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const existingSkills = await this.skillRepository.find({
+      where: skillNames.map((name) => ({ name })),
+    });
+    const existingSkillNames = existingSkills.map((skill) => skill.name);
+    const newSkillNames = skillNames.filter(
+      (name) => !existingSkillNames.includes(name),
+    );
+    const newSkills = this.skillRepository.create(
+      newSkillNames.map((name) => ({ name })),
+    );
+    await this.skillRepository.save(newSkills);
+
+    const allSkills = [...existingSkills, ...newSkills];
+    user.skills = [...(user.skills || []), ...allSkills];
+    await this.userRepository.save(user);
   }
 }

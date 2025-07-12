@@ -7,9 +7,10 @@ import { typeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './auth/auth.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { SkillModule } from './skill/skill.module';
 
 @Module({
-  imports: [TypeOrmModule.forRoot(typeOrmConfig), UserModule, AuthModule],
+  imports: [TypeOrmModule.forRoot(typeOrmConfig), UserModule, AuthModule, SkillModule],
   controllers: [AppController],
   providers: [
     AppService,
