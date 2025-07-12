@@ -1,5 +1,7 @@
 import { DataSource } from 'typeorm';
 
+// CLI DataSource configuration (for migrations, etc.)
+// Note: This uses process.env directly since it's used outside NestJS context
 export default new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
